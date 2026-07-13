@@ -30,6 +30,7 @@ function App() {
   const [history, setHistory] = useState([]);
   const [isEditing, setIsEditing] = useState(false);
   const [editId, setEditId] = useState(null);
+  const [loading, setLoading] = useState(false);
 
   useEffect(() => {
     apiCall('/api/bmi')
@@ -38,7 +39,7 @@ function App() {
           setHistory(data);
         }
       })
-      .catch((err) => console.error(err));
+      .catch((err) => console.error("Could not fetch history on load:", err));
   }, []);
 
   const handleFormSubmit = async (e) => {
@@ -48,10 +49,12 @@ function App() {
     const hInFeet = parseFloat(height);
     const wInKg = parseFloat(weight);
     
-    if (isNaN(hInFeet) || isNaN(wInKg) || hInFeet <= 0 || wInKg <= 0) {
-      alert("Please enter valid height and weight values.");
+    if (!name || isNaN(hInFeet) || isNaN(wInKg) || hInFeet <= 0 || wInKg <= 0) {
+      alert("Please enter a valid name, height, and weight.");
       return;
     }
+
+    setLoading(true);
 
     const heightInMeters = hInFeet * 0.3048;
     const bmiValue = parseFloat((wInKg / (heightInMeters * heightInMeters)).toFixed(1));
@@ -80,7 +83,7 @@ function App() {
       } else {
         const newRecord = await apiCall('/api/bmi', 'POST', payload);
         if (newRecord) {
-          setResult({ ...newRecord, message: 'Calculation successful!' });
+          setResult({ ...newRecord, message: 'Calculation saved to database!' });
           setHistory([newRecord, ...history]);
           setName('');
           setHeight('');
@@ -88,8 +91,9 @@ function App() {
         }
       }
     } catch (err) {
-      alert("Could not connect to the calculation server. Please try again.");
-      console.error(err);
+      alert("Could not save to the server. If the backend was asleep, it may take 1 minute to wake up. Please try again in a moment.");
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -117,7 +121,7 @@ function App() {
         setWeight('');
       }
     } catch (err) {
-      console.error(err);
+      console.error("Delete failed:", err);
     }
   };
 
@@ -175,8 +179,8 @@ function App() {
             />
           </div>
           
-          <button type="submit" className={isEditing ? 'btn-update' : ''}>
-            {isEditing ? '💡 Update & Save Log' : 'Calculate & Save'}
+          <button type="submit" className={isEditing ? 'btn-update' : ''} disabled={loading}>
+            {loading ? 'Connecting...' : isEditing ? '💡 Update & Save Log' : 'Calculate & Save'}
           </button>
           
           {isEditing && (

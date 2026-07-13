@@ -12,6 +12,9 @@ const apiCall = async (endpoint, method = 'GET', body = null) => {
   
   try {
     const res = await fetch(`${BACKEND_URL}${endpoint}`, options);
+    if (!res.ok) {
+      throw new Error(`HTTP error! status: ${res.status}`);
+    }
     return res.status !== 204 ? await res.json() : null;
   } catch (err) {
     console.error(`API Error (${method} ${endpoint}):`, err);
@@ -30,12 +33,17 @@ function App() {
 
   useEffect(() => {
     apiCall('/api/bmi')
-      .then((data) => setHistory(data))
+      .then((data) => {
+        if (data && Array.isArray(data)) {
+          setHistory(data);
+        }
+      })
       .catch((err) => console.error(err));
   }, []);
 
   const handleFormSubmit = async (e) => {
     e.preventDefault();
+    e.stopPropagation();
     
     const hInFeet = parseFloat(height);
     const wInKg = parseFloat(weight);
@@ -60,29 +68,36 @@ function App() {
     try {
       if (isEditing) {
         const updatedRecord = await apiCall(`/api/bmi/${editId}`, 'PUT', payload);
-        setHistory(history.map(item => item._id === editId ? updatedRecord : item));
-        setResult({ ...updatedRecord, message: 'Record updated successfully!' });
-        setIsEditing(false);
-        setEditId(null);
+        if (updatedRecord) {
+          setHistory(history.map(item => item._id === editId ? updatedRecord : item));
+          setResult({ ...updatedRecord, message: 'Record updated successfully!' });
+          setIsEditing(false);
+          setEditId(null);
+          setName('');
+          setHeight('');
+          setWeight('');
+        }
       } else {
         const newRecord = await apiCall('/api/bmi', 'POST', payload);
-        setResult({ ...newRecord, message: 'Calculation successful!' });
-        setHistory([newRecord, ...history]);
+        if (newRecord) {
+          setResult({ ...newRecord, message: 'Calculation successful!' });
+          setHistory([newRecord, ...history]);
+          setName('');
+          setHeight('');
+          setWeight('');
+        }
       }
     } catch (err) {
+      alert("Could not connect to the calculation server. Please try again.");
       console.error(err);
     }
-
-    setName('');
-    setHeight('');
-    setWeight('');
   };
 
   const startEdit = (item) => {
     window.scrollTo({ top: 0, behavior: 'smooth' });
     setName(item.name);
-    setHeight(item.rawHeight || "5.6");
-    setWeight(item.rawWeight || "60");
+    setHeight(item.height ? item.height.toString() : "5.6");
+    setWeight(item.weight ? item.weight.toString() : "60");
     setIsEditing(true);
     setEditId(item._id);
   };

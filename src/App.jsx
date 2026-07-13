@@ -1,5 +1,23 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import './App.css';
+
+const BACKEND_URL = 'https://bmi-qrfh.onrender.com';
+
+const apiCall = async (endpoint, method = 'GET', body = null) => {
+  const options = {
+    method,
+    headers: body ? { 'Content-Type': 'application/json' } : {}
+  };
+  if (body) options.body = JSON.stringify(body);
+  
+  try {
+    const res = await fetch(`${BACKEND_URL}${endpoint}`, options);
+    return res.status !== 204 ? await res.json() : null;
+  } catch (err) {
+    console.error(`API Error (${method} ${endpoint}):`, err);
+    throw err;
+  }
+};
 
 function App() {
   const [name, setName] = useState('');
@@ -10,7 +28,13 @@ function App() {
   const [isEditing, setIsEditing] = useState(false);
   const [editId, setEditId] = useState(null);
 
-  const handleFormSubmit = (e) => {
+  useEffect(() => {
+    apiCall('/api/bmi')
+      .then((data) => setHistory(data))
+      .catch((err) => console.error(err));
+  }, []);
+
+  const handleFormSubmit = async (e) => {
     e.preventDefault();
     
     const hInFeet = parseFloat(height);
@@ -31,35 +55,22 @@ function App() {
     else if (bmiValue >= 30 && bmiValue < 35) category = 'Obese Class I';
     else category = 'Obese Class II';
 
-    if (isEditing) {
-      const updatedHistory = history.map((item) => {
-        if (item._id === editId) {
-          return {
-            ...item,
-            name: name,
-            bmi: bmiValue,
-            category: category,
-            message: 'Record updated successfully!'
-          };
-        }
-        return item;
-      });
+    const payload = { name, bmi: bmiValue, category };
 
-      const updatedRecord = updatedHistory.find(item => item._id === editId);
-      setHistory(updatedHistory);
-      setResult(updatedRecord);
-      setIsEditing(false);
-      setEditId(null);
-    } else {
-      const newRecord = {
-        _id: Date.now().toString(),
-        name: name,
-        bmi: bmiValue,
-        category: category,
-        message: 'Calculation successful!'
-      };
-      setResult(newRecord);
-      setHistory([newRecord, ...history]);
+    try {
+      if (isEditing) {
+        const updatedRecord = await apiCall(`/api/bmi/${editId}`, 'PUT', payload);
+        setHistory(history.map(item => item._id === editId ? updatedRecord : item));
+        setResult({ ...updatedRecord, message: 'Record updated successfully!' });
+        setIsEditing(false);
+        setEditId(null);
+      } else {
+        const newRecord = await apiCall('/api/bmi', 'POST', payload);
+        setResult({ ...newRecord, message: 'Calculation successful!' });
+        setHistory([newRecord, ...history]);
+      }
+    } catch (err) {
+      console.error(err);
     }
 
     setName('');
@@ -76,17 +87,22 @@ function App() {
     setEditId(item._id);
   };
 
-  const deleteRecord = (id) => {
-    setHistory(history.filter(item => item._id !== id));
-    if (result && result._id === id) {
-      setResult(null);
-    }
-    if (editId === id) {
-      setIsEditing(false);
-      setEditId(null);
-      setName('');
-      setHeight('');
-      setWeight('');
+  const deleteRecord = async (id) => {
+    try {
+      await apiCall(`/api/bmi/${id}`, 'DELETE');
+      setHistory(history.filter(item => item._id !== id));
+      if (result && result._id === id) {
+        setResult(null);
+      }
+      if (editId === id) {
+        setIsEditing(false);
+        setEditId(null);
+        setName('');
+        setHeight('');
+        setWeight('');
+      }
+    } catch (err) {
+      console.error(err);
     }
   };
 

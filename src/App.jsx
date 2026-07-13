@@ -1,7 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import './App.css';
 
-const BACKEND_URL = 'https://bmi-qrfh.onrender.com';
+const BACKEND_URL = (typeof window !== 'undefined' && window.__BACKEND_URL__)
+  ? window.__BACKEND_URL__
+  : (typeof window !== 'undefined' && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')
+    ? 'http://localhost:5000'
+    : '');
 
 const apiCall = async (endpoint, method = 'GET', body = null) => {
   const options = {
@@ -116,7 +120,6 @@ function App() {
 
   return (
     <div className="app-layout-container">
-      {/* Centered Top Heading */}
       <header className="site-header">
         <div className="site-brand">
           <div className="logo" aria-hidden="true"></div>
@@ -125,7 +128,6 @@ function App() {
         <div className="site-subtitle">Quick, friendly BMI calculations & logs</div>
       </header>
 
-      {/* Main Dual Panels */}
       <div className="app-wrapper">
         <div className="container">
           <form onSubmit={handleFormSubmit}>

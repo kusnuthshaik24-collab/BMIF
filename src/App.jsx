@@ -11,9 +11,9 @@ const getBackendURL = () => {
   if (typeof window !== 'undefined') {
     const hostname = window.location.hostname;
     if (hostname === 'localhost' || hostname === '127.0.0.1') {
-      return 'http://localhost:5000';
+      return 'https://bmi-qrfh.onrender.com';
     }
-    return 'https://bmi-qrfh.onrender.com/';
+    return 'https://bmi-qrfh.onrender.com';
   }
 
   console.warn('⚠️ BACKEND_URL not configured. Please set window.__BACKEND_URL__ in index.html');

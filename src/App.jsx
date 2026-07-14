@@ -1,334 +1,307 @@
-import React, { useState, useEffect } from 'react';
-import './App.css';
-
-const getBackendURL = () => {
-
-  if (typeof window !== 'undefined' && window.__BACKEND_URL__) {
-    return window.__BACKEND_URL__;
-  }
+/* 1. Design System & Base Setup */
+:root {
+  --background: #e0f2fe;
+  --foreground: #0f172a;
+  --primary: #0d9488;
+  --primary-foreground: #ffffff;
+  --card: #ffffff;
+  --radius: 1rem;
+  --font-sans: 'Plus Jakarta Sans', sans-serif;
   
-  // Priority 2: Check if running on localhost
-  if (typeof window !== 'undefined') {
-    const hostname = window.location.hostname;
-    if (hostname === 'localhost' || hostname === '127.0.0.1') {
-      return 'http://localhost:5000';
-    }
-    return 'https://bmi-qrfh.onrender.com';
-  }
-
-  console.warn('⚠️ BACKEND_URL not configured. Please set window.__BACKEND_URL__ in index.html');
-  return '';
-};
-
-const BACKEND_URL = getBackendURL();
-
-console.log('🔗 Backend URL:', BACKEND_URL || 'NOT SET - Check console warnings');
-
-const apiCall = async (endpoint, method = 'GET', body = null) => {
-  if (!BACKEND_URL) {
-    console.error('❌ Backend URL is not configured');
-    throw new Error('Backend URL is not configured. Please update index.html with the backend URL.');
-  }
-
-  const options = {
-    method,
-    headers: body ? { 'Content-Type': 'application/json' } : {}
-  };
-  if (body) options.body = JSON.stringify(body);
+  /* Shared Gradient Backdrops */
+  --bg-gradient: linear-gradient(135deg, #e0f2fe 0%, #bfdbfe 50%, #ddd6fe 100%);
+  --form-gradient: linear-gradient(160deg, #06b6d4 0%, #059669 45%, #10b981 100%);
+  --btn-gradient: linear-gradient(135deg, #ff7a18 0%, #ff5e62 100%);
   
-  try {
-    const url = `${BACKEND_URL}${endpoint}`;
-    console.log(`📤 ${method} ${url}`);
-    const res = await fetch(url, options);
-    
-    if (!res.ok) {
-      throw new Error(`HTTP ${res.status}: ${res.statusText}`);
-    }
-    
-    return res.status !== 204 ? await res.json() : null;
-  } catch (err) {
-    console.error(`❌ API Error (${method} ${endpoint}):`, err);
-    throw err;
-  }
-};
-
-function App() {
-  const [name, setName] = useState('');
-  const [height, setHeight] = useState('');
-  const [weight, setWeight] = useState('');
-  const [result, setResult] = useState(null);
-  const [history, setHistory] = useState([]);
-  const [isEditing, setIsEditing] = useState(false);
-  const [editId, setEditId] = useState(null);
-  const [error, setError] = useState(null);
-
-  useEffect(() => {
-    apiCall('/api/bmi')
-      .then((data) => {
-        console.log('✅ History loaded:', data);
-        setHistory(Array.isArray(data) ? data : []);
-        setError(null);
-      })
-      .catch((err) => {
-        console.error('❌ Failed to load history:', err);
-        setError(`Failed to connect to backend: ${err.message}`);
-      });
-  }, []);
-
-  const handleFormSubmit = async (e) => {
-    e.preventDefault();
-    
-    const hInFeet = parseFloat(height);
-    const wInKg = parseFloat(weight);
-    
-    if (isNaN(hInFeet) || isNaN(wInKg) || hInFeet <= 0 || wInKg <= 0) {
-      alert("Please enter valid height and weight values.");
-      return;
-    }
-
-    const heightInMeters = hInFeet * 0.3048;
-    const bmiValue = parseFloat((wInKg / (heightInMeters * heightInMeters)).toFixed(1));
-
-    let category = '';
-    if (bmiValue < 18.5) category = 'Underweight';
-    else if (bmiValue >= 18.5 && bmiValue < 25) category = 'Normal';
-    else if (bmiValue >= 25 && bmiValue < 30) category = 'Overweight';
-    else if (bmiValue >= 30 && bmiValue < 35) category = 'Obese Class I';
-    else category = 'Obese Class II';
-
-    const payload = {
-      name,
-      height: hInFeet,
-      weight: wInKg,
-      bmi: bmiValue,
-      category
-    };
-
-    try {
-      if (isEditing) {
-        const updatedRecord = await apiCall(`/api/bmi/${editId}`, 'PUT', payload);
-        setHistory(history.map(item => item._id === editId ? updatedRecord : item));
-        setResult({ ...updatedRecord, message: 'Record updated successfully!' });
-        setIsEditing(false);
-        setEditId(null);
-      } else {
-        const newRecord = await apiCall('/api/bmi', 'POST', payload);
-        setResult({ ...newRecord, message: 'Calculation successful!' });
-        setHistory([newRecord, ...history]);
-      }
-    } catch (err) {
-      console.error(err);
-      setError(`Failed to save record: ${err.message}`);
-    }
-
-    setName('');
-    setHeight('');
-    setWeight('');
-  };
-
-  const startEdit = (item) => {
-    window.scrollTo({ top: 0, behavior: 'smooth' });
-    setName(item.name);
-    setHeight(item.rawHeight || "5.6");
-    setWeight(item.rawWeight || "60");
-    setIsEditing(true);
-    setEditId(item._id);
-  };
-
-  const deleteRecord = async (id) => {
-    try {
-      await apiCall(`/api/bmi/${id}`, 'DELETE');
-      setHistory(history.filter(item => item._id !== id));
-      if (result && result._id === id) {
-        setResult(null);
-      }
-      if (editId === id) {
-        setIsEditing(false);
-        setEditId(null);
-        setName('');
-        setHeight('');
-        setWeight('');
-      }
-    } catch (err) {
-      console.error(err);
-    }
-  };
-
-  const getPointerRotation = (bmi) => {
-    if (!bmi) return -90; 
-    const minBmi = 15;
-    const maxBmi = 40;
-    const percentage = Math.min(Math.max((bmi - minBmi) / (maxBmi - minBmi), 0), 1);
-    return -90 + percentage * 180;
-  };
-
-  return (
-    <div className="app-layout-container">
-      <header className="site-header">
-        <div className="site-brand">
-          <div className="logo" aria-hidden="true"></div>
-          <div className="site-title">BMI Tracker</div>
-        </div>
-        <div className="site-subtitle">Quick, friendly BMI calculations & logs</div>
-      </header>
-
-      <div className="app-wrapper">
-        <div className="container">
-          {error && (
-            <div style={{ 
-              background: 'rgba(239, 68, 68, 0.9)', 
-              color: '#fff', 
-              padding: '12px', 
-              borderRadius: '8px', 
-              marginBottom: '15px',
-              fontSize: '13px'
-            }}>
-              ⚠️ {error}
-            </div>
-          )}
-          <form onSubmit={handleFormSubmit}>
-            <div className="input-group">
-              <label>NAME</label>
-              <input 
-                type="text" 
-                value={name} 
-                onChange={(e) => setName(e.target.value)} 
-                placeholder="Enter Name"
-                required
-              />
-            </div>
-            
-            <div className="input-group">
-              <label>HEIGHT (FEET)</label>
-              <input 
-                type="text" 
-                value={height} 
-                onChange={(e) => {
-                  const val = e.target.value;
-                  if (val === '' || /^[0-9.]*$/.test(val)) {
-                    setHeight(val);
-                  }
-                }} 
-                placeholder="Enter Height in feet (e.g. 5.6)"
-                required
-              />
-            </div>
-
-            <div className="input-group">
-              <label>WEIGHT (KG)</label>
-              <input 
-                type="number" 
-                value={weight} 
-                onChange={(e) => setWeight(e.target.value)} 
-                placeholder="Enter Weight in kg"
-                required
-              />
-            </div>
-            
-            <button type="submit" className={isEditing ? 'btn-update' : ''}>
-              {isEditing ? '💡 Update & Save Log' : 'Calculate & Save'}
-            </button>
-            
-            {isEditing && (
-              <button 
-                type="button" 
-                className="btn-cancel"
-                onClick={() => {
-                  setIsEditing(false);
-                  setEditId(null);
-                  setName('');
-                  setHeight('');
-                  setWeight('');
-                }}
-              >
-                Cancel Edit
-              </button>
-            )}
-          </form>
-
-          {result && (
-            <div className="result">
-              <h4 style={{ color: '#ffffff', margin: '0 0 10px 0', opacity: 0.9 }}>{result.message}</h4>
-              <h3 style={{ color: '#ffffff', marginBottom: '6px' }}>Result for {result.name}</h3>
-              <p style={{ color: '#ffffff', margin: '4px 0' }}><strong>BMI:</strong> {result.bmi}</p>
-              <p style={{ color: '#ffffff', margin: '4px 0' }}><strong>Category:</strong> {result.category}</p>
-            </div>
-          )}
-
-          {history.length > 0 && (
-            <div style={{ marginTop: '35px' }}>
-              <h3 style={{ color: '#ffffff', textAlign: 'center', marginBottom: '15px' }}>History Logs</h3>
-              <div style={{ maxHeight: '240px', overflowY: 'auto', paddingRight: '4px' }} className="scrollbar-thin">
-                {history.map((item) => (
-                  <div key={item._id} className="history-item">
-                    <div style={{ flex: 1, paddingRight: '10px' }}>
-                      <strong>{item.name}</strong>: {item.bmi} ({item.category})
-                    </div>
-                    <div className="history-actions">
-                      <button className="edit-btn" onClick={() => startEdit(item)}>
-                        Edit
-                      </button>
-                      <button className="delete-btn" onClick={() => deleteRecord(item._id)}>
-                        Delete
-                      </button>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-        </div>
-
-        <div className="chart-container">
-          <h3 className="chart-title">Result View</h3>
-          
-          <div className="gauge-wrapper">
-            <div className="gauge-body">
-              <div className="gauge-segment underweight"></div>
-              <div className="gauge-segment normal"></div>
-              <div className="gauge-segment overweight"></div>
-              <div className="gauge-segment obese1"></div>
-              <div className="gauge-segment obese2"></div>
-              <div className="gauge-core"></div>
-              
-              <div 
-                className="gauge-pointer-wrapper" 
-                style={{ transform: `rotate(${getPointerRotation(result ? result.bmi : null)}deg)` }}
-              >
-                <div className="gauge-pointer"></div>
-              </div>
-            </div>
-            
-            <div className="gauge-value-display">
-              <span className="gauge-value-num" style={{ color: result?.category === 'Normal' ? '#10b981' : 'var(--primary)' }}>
-                {result ? result.bmi : '--.-'}
-              </span>
-              <span className="gauge-value-text" style={{ color: result?.category === 'Normal' ? '#10b981' : '#64748b' }}>
-                {result ? result.category : 'No calculation yet'}
-              </span>
-            </div>
-
-            <div className="gauge-labels">
-              <span className="lbl-15">15.0</span>
-              <span className="lbl-18">18.5</span>
-              <span className="lbl-25">25.0</span>
-              <span className="lbl-30">30.0</span>
-              <span className="lbl-35">35.0</span>
-              <span className="lbl-40">40.0</span>
-            </div>
-          </div>
-
-          <div className="chart-legend">
-            <div className="legend-item"><span className="dot uw-dot"></span> Underweight</div>
-            <div className="legend-item"><span className="dot nw-dot"></span> Normal</div>
-            <div className="legend-item"><span className="dot ow-dot"></span> Overweight</div>
-            <div className="legend-item"><span className="dot o1-dot"></span> Obese Class I</div>
-            <div className="legend-item"><span className="dot o2-dot"></span> Obese Class II</div>
-          </div>
-        </div>
-      </div>
-    </div>
-  );
+  /* Gauge Colors */
+  --c-uw: #38bdf8; --c-nw: #10b981; --c-ow: #fbdf68; --c-o1: #fb923c; --c-o2: #ef4444;
 }
 
-export default App;
+* { box-sizing: border-box; margin: 0; }
+html { scroll-behavior: smooth; }
+
+body {
+  background: var(--bg-gradient);
+  color: var(--foreground);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+  min-height: 100vh;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  padding: 40px 20px;
+}
+
+/* 2. Layout Structure */
+.app-wrapper {
+  display: flex;
+  gap: 40px;
+  max-width: 1020px;
+  width: 100%;
+  justify-content: center;
+}
+
+.site-header {
+  width: 100%;
+  max-width: 1020px;
+  margin-bottom: 8px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+}
+
+.site-brand { display: flex; align-items: center; gap: 12px; }
+
+.logo {
+  width: 46px;
+  height: 46px;
+  border-radius: 10px;
+  background: linear-gradient(135deg, #f97316 0%, #10b981 100%);
+  box-shadow: 0 8px 24px rgba(16,185,129,0.18);
+}
+
+.site-title { font-size: 20px; font-weight: 800; }
+.site-subtitle { font-size: 13px; color: rgba(15,23,42,0.7); font-weight: 600; }
+
+/* 3. Panel Cards (Form & Chart Panels) */
+.container, .chart-container {
+  flex: 1;
+  max-width: 460px;
+  padding: 40px;
+  border-radius: 24px;
+  min-height: 520px;
+  z-index: 3;
+  box-sizing: border-box;
+}
+
+.container {
+  background: var(--form-gradient);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  color: var(--primary-foreground);
+  box-shadow: 0 20px 40px rgba(13, 148, 136, 0.25);
+}
+
+.chart-container {
+  background: linear-gradient(180deg, #ffffff 0%, #fbfdff 100%);
+  border: 1px solid rgba(226, 232, 240, 0.8);
+  box-shadow: 0 20px 40px rgba(15, 23, 42, 0.06);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.chart-title {
+  color: var(--primary);
+  margin-bottom: 40px;
+  font-size: 22px;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+/* 4. Inputs & Buttons */
+.input-group { margin-bottom: 22px; }
+.input-group label {
+  display: block;
+  margin-bottom: 10px;
+  font-weight: 800;
+  font-size: 14px;
+  text-transform: uppercase;
+  letter-spacing: 1.2px;
+}
+
+.input-group input {
+  width: 100%;
+  background: rgba(255, 255, 255, 0.95);
+  border: 1.5px solid rgba(255, 255, 255, 0.7);
+  border-radius: var(--radius);
+  padding: 1.25rem 1.5rem;
+  font-size: 1.05rem;
+  color: #0f172a;
+  outline: none;
+  transition: all 200ms ease;
+}
+.input-group input::placeholder {
+  color: rgba(15, 23, 42, 0.45);
+}
+.input-group input:focus { box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.25); }
+
+button[type="submit"] {
+  background: var(--btn-gradient);
+  color: #ffffff;
+  border-radius: var(--radius);
+  padding: 1.15rem 1.75rem;
+  font-size: 1.05rem;
+  font-weight: 800;
+  width: 100%;
+  border: none;
+  cursor: pointer;
+  transition: all 150ms ease;
+  box-shadow: 0 8px 28px rgba(255, 122, 24, 0.18);
+}
+button[type="submit"]:hover { transform: translateY(-1px); box-shadow: 0 6px 28px rgba(249, 115, 22, 0.55); }
+
+.btn-update { background: linear-gradient(135deg, #0284c7 0%, #0369a1 100%) !important; }
+.btn-cancel {
+  background: transparent;
+  color: rgba(255, 255, 255, 0.85);
+  border: 1.5px dashed rgba(255, 255, 255, 0.4);
+  border-radius: 0.875rem;
+  padding: 0.75rem 1.5rem;
+  width: 100%;
+  cursor: pointer;
+  margin-top: 10px;
+}
+
+/* 5. Result & History Lists */
+.result {
+  margin-top: 25px;
+  padding: 1.25rem 1.5rem;
+  background: rgba(255, 255, 255, 0.95);
+  color: #0f172a;
+  border: 1.5px solid rgba(255, 255, 255, 0.8);
+  border-radius: var(--radius);
+  backdrop-filter: blur(8px);
+  animation: fadeInUp 0.35s ease forwards;
+}
+
+.result h4,
+.result h3,
+.result p {
+  color: #0f172a !important;
+}
+
+.history-item {
+  background: rgba(255, 255, 255, 0.95);
+  color: #0f172a;
+  border-radius: 0.875rem;
+  padding: 1rem 1.25rem;
+  margin-top: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 14px;
+}
+
+.history-item strong {
+  color: #0f172a;
+}
+
+.history-actions { display: flex; gap: 8px; }
+.edit-btn, .delete-btn {
+  border-radius: 0.5rem;
+  padding: 0.375rem 0.875rem;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+.edit-btn { background: #e0f2fe; color: #0369a1; border: 1.5px solid #bae6fd; }
+.delete-btn { background: #fee2e2; color: #ef4444; border: 1.5px solid #fca5a5; }
+
+/* 6. The Gauge Meter Graphic */
+.gauge-wrapper { position: relative; width: 340px; height: 190px; margin-top: 10px; }
+.gauge-body {
+  position: relative;
+  width: 340px;
+  height: 170px;
+  border-top-left-radius: 150px;
+  border-top-right-radius: 150px;
+  overflow: hidden;
+  background: #f1f5f9;
+}
+
+.gauge-segment {
+  position: absolute;
+  width: 300px;
+  height: 300px;
+  border-radius: 50%;
+  clip-path: polygon(50% 50%, 50% 0%, 100% 0%, 100% 50%);
+  transform-origin: 50% 50%;
+}
+/* Rotations mapping the BMI spectrum */
+.underweight { background: var(--c-uw); transform: rotate(-90deg); }
+.normal      { background: var(--c-nw); transform: rotate(-64.8deg); }
+.overweight  { background: var(--c-ow); transform: rotate(-18deg); }
+.obese1      { background: var(--c-o1); transform: rotate(18deg); }
+.obese2      { background: var(--c-o2); transform: rotate(54deg); }
+
+.gauge-core {
+  position: absolute;
+  top: 35px;
+  left: 35px;
+  width: 230px;
+  height: 230px;
+  background: #ffffff;
+  border-radius: 50%;
+  z-index: 2;
+}
+
+.gauge-pointer-wrapper {
+  position: absolute;
+  bottom: 0;
+  left: 50%;
+  width: 24px;
+  height: 140px;
+  margin-left: -12px;
+  transform-origin: 50% 100%;
+  z-index: 5;
+  transition: transform 0.7s cubic-bezier(0.4, 0, 0.2, 1);
+}
+.gauge-pointer {
+  width: 0; height: 0;
+  border-left: 12px solid transparent;
+  border-right: 12px solid transparent;
+  border-bottom: 45px solid #0f172a;
+}
+
+.gauge-value-display {
+  position: absolute;
+  bottom: -5px; left: 0; right: 0;
+  text-align: center;
+  z-index: 10;
+  display: flex;
+  flex-direction: column;
+}
+.gauge-value-num { font-size: 46px; font-weight: 800; }
+.gauge-value-text { font-size: 15px; font-weight: 700; }
+
+/* Outer Scale Labels */
+.gauge-labels span { position: absolute; font-size: 12px; color: #94a3b8; font-weight: 600; }
+.lbl-15 { bottom: 15px; left: -14px; }
+.lbl-18 { top: 65px; left: 6px; }
+.lbl-25 { top: -4px; left: 78px; }
+.lbl-30 { top: -4px; right: 78px; }
+.lbl-35 { top: 65px; right: 6px; }
+.lbl-40 { bottom: 15px; right: -14px; }
+
+/* Legend & Utilities */
+.chart-legend {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px 24px;
+  margin-top: 45px;
+  width: 100%;
+}
+.legend-item { display: flex; align-items: center; font-size: 13px; font-weight: 600; color: #475569; }
+.dot { width: 11px; height: 11px; border-radius: 50%; margin-right: 10px; }
+
+.uw-dot { background: var(--c-uw); }
+.nw-dot { background: var(--c-nw); }
+.ow-dot { background: var(--c-ow); }
+.o1-dot { background: var(--c-o1); }
+.o2-dot { background: var(--c-o2); }
+
+/* 7. Global Animations & Media Queries */
+@keyframes fadeInUp {
+  from { opacity: 0; transform: translateY(12px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/* Hide default Chrome/Firefox number inputs layout */
+input::-webkit-outer-spin-button, input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+input[type=number] { -moz-appearance: textfield; }
+
+@media (max-width: 820px) {
+  .app-wrapper { flex-direction: column; align-items: center; }
+  .container, .chart-container { max-width: 100%; }
+}

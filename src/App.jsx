@@ -1,13 +1,35 @@
 import React, { useState, useEffect } from 'react';
 import './App.css';
 
-const BACKEND_URL = (typeof window !== 'undefined' && window.__BACKEND_URL__)
-  ? window.__BACKEND_URL__
-  : (typeof window !== 'undefined' && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')
-    ? 'http://localhost:5000'
-    : '');
+const getBackendURL = () => {
+
+  if (typeof window !== 'undefined' && window.__BACKEND_URL__) {
+    return window.__BACKEND_URL__;
+  }
+  
+  // Priority 2: Check if running on localhost
+  if (typeof window !== 'undefined') {
+    const hostname = window.location.hostname;
+    if (hostname === 'localhost' || hostname === '127.0.0.1') {
+      return 'http://localhost:5000';
+    }
+    return 'https://bmi-qrfh.onrender.com';
+  }
+
+  console.warn('⚠️ BACKEND_URL not configured. Please set window.__BACKEND_URL__ in index.html');
+  return '';
+};
+
+const BACKEND_URL = getBackendURL();
+
+console.log('🔗 Backend URL:', BACKEND_URL || 'NOT SET - Check console warnings');
 
 const apiCall = async (endpoint, method = 'GET', body = null) => {
+  if (!BACKEND_URL) {
+    console.error('❌ Backend URL is not configured');
+    throw new Error('Backend URL is not configured. Please update index.html with the backend URL.');
+  }
+
   const options = {
     method,
     headers: body ? { 'Content-Type': 'application/json' } : {}
@@ -15,10 +37,17 @@ const apiCall = async (endpoint, method = 'GET', body = null) => {
   if (body) options.body = JSON.stringify(body);
   
   try {
-    const res = await fetch(`${BACKEND_URL}${endpoint}`, options);
+    const url = `${BACKEND_URL}${endpoint}`;
+    console.log(`📤 ${method} ${url}`);
+    const res = await fetch(url, options);
+    
+    if (!res.ok) {
+      throw new Error(`HTTP ${res.status}: ${res.statusText}`);
+    }
+    
     return res.status !== 204 ? await res.json() : null;
   } catch (err) {
-    console.error(`API Error (${method} ${endpoint}):`, err);
+    console.error(`❌ API Error (${method} ${endpoint}):`, err);
     throw err;
   }
 };
@@ -31,11 +60,19 @@ function App() {
   const [history, setHistory] = useState([]);
   const [isEditing, setIsEditing] = useState(false);
   const [editId, setEditId] = useState(null);
+  const [error, setError] = useState(null);
 
   useEffect(() => {
     apiCall('/api/bmi')
-      .then((data) => setHistory(data))
-      .catch((err) => console.error(err));
+      .then((data) => {
+        console.log('✅ History loaded:', data);
+        setHistory(Array.isArray(data) ? data : []);
+        setError(null);
+      })
+      .catch((err) => {
+        console.error('❌ Failed to load history:', err);
+        setError(`Failed to connect to backend: ${err.message}`);
+      });
   }, []);
 
   const handleFormSubmit = async (e) => {
@@ -59,7 +96,13 @@ function App() {
     else if (bmiValue >= 30 && bmiValue < 35) category = 'Obese Class I';
     else category = 'Obese Class II';
 
-    const payload = { name, bmi: bmiValue, category };
+    const payload = {
+      name,
+      height: hInFeet,
+      weight: wInKg,
+      bmi: bmiValue,
+      category
+    };
 
     try {
       if (isEditing) {
@@ -75,6 +118,7 @@ function App() {
       }
     } catch (err) {
       console.error(err);
+      setError(`Failed to save record: ${err.message}`);
     }
 
     setName('');
@@ -130,6 +174,18 @@ function App() {
 
       <div className="app-wrapper">
         <div className="container">
+          {error && (
+            <div style={{ 
+              background: 'rgba(239, 68, 68, 0.9)', 
+              color: '#fff', 
+              padding: '12px', 
+              borderRadius: '8px', 
+              marginBottom: '15px',
+              fontSize: '13px'
+            }}>
+              ⚠️ {error}
+            </div>
+          )}
           <form onSubmit={handleFormSubmit}>
             <div className="input-group">
               <label>NAME</label>

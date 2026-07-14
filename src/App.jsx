@@ -2,7 +2,6 @@ import React, { useState, useEffect } from 'react';
 import './App.css';
 
 const getBackendURL = () => {
-
   if (typeof window !== 'undefined' && window.__BACKEND_URL__) {
     return window.__BACKEND_URL__;
   }
@@ -128,7 +127,9 @@ function App() {
       setError(`Failed to save record: ${err.message}`);
     }
 
+    // Fixed: Properly resetting all inputs (including age) upon submit
     setName('');
+    setAge('');
     setHeight('');
     setWeight('');
   };
@@ -203,6 +204,7 @@ function App() {
                 value={name} 
                 onChange={(e) => setName(e.target.value)} 
                 placeholder="Enter Name"
+                autoComplete="off"
                 required
               />
             </div>
@@ -215,6 +217,7 @@ function App() {
                 min="1"
                 onChange={(e) => setAge(e.target.value)}
                 placeholder="Enter Age in years"
+                autoComplete="off"
                 required
               />
             </div>
@@ -231,6 +234,7 @@ function App() {
                   }
                 }} 
                 placeholder="Enter Height in feet (e.g. 5.6)"
+                autoComplete="off"
                 required
               />
             </div>
@@ -242,6 +246,7 @@ function App() {
                 value={weight} 
                 onChange={(e) => setWeight(e.target.value)} 
                 placeholder="Enter Weight in kg"
+                autoComplete="off"
                 required
               />
             </div>
@@ -258,6 +263,7 @@ function App() {
                   setIsEditing(false);
                   setEditId(null);
                   setName('');
+                  setAge('');
                   setHeight('');
                   setWeight('');
                 }}

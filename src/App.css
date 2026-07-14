@@ -117,8 +117,12 @@ body {
   border-radius: var(--radius);
   padding: 1.25rem 1.5rem;
   font-size: 1.05rem;
+  color: #0f172a;
   outline: none;
   transition: all 200ms ease;
+}
+.input-group input::placeholder {
+  color: rgba(15, 23, 42, 0.45);
 }
 .input-group input:focus { box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.25); }
 
@@ -153,15 +157,23 @@ button[type="submit"]:hover { transform: translateY(-1px); box-shadow: 0 6px 28p
 .result {
   margin-top: 25px;
   padding: 1.25rem 1.5rem;
-  background: rgba(255, 255, 255, 0.18);
-  border: 1.5px solid rgba(255, 255, 255, 0.35);
+  background: rgba(255, 255, 255, 0.95);
+  color: #0f172a;
+  border: 1.5px solid rgba(255, 255, 255, 0.8);
   border-radius: var(--radius);
   backdrop-filter: blur(8px);
   animation: fadeInUp 0.35s ease forwards;
 }
 
+.result h4,
+.result h3,
+.result p {
+  color: #0f172a !important;
+}
+
 .history-item {
   background: rgba(255, 255, 255, 0.95);
+  color: #0f172a;
   border-radius: 0.875rem;
   padding: 1rem 1.25rem;
   margin-top: 12px;
@@ -169,6 +181,10 @@ button[type="submit"]:hover { transform: translateY(-1px); box-shadow: 0 6px 28p
   align-items: center;
   justify-content: space-between;
   font-size: 14px;
+}
+
+.history-item strong {
+  color: #0f172a;
 }
 
 .history-actions { display: flex; gap: 8px; }
